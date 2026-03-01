@@ -2609,8 +2609,16 @@ export class InteractiveMode {
 		const ignoreSigint = () => {};
 		process.on("SIGINT", ignoreSigint);
 
+		// Keep the event loop alive while suspended. After ui.stop() pauses
+		// stdin, there may be no other active handles keeping the loop running.
+		// Signal handles (SIGCONT) are unreferenced by default in libuv, so
+		// without an active timer the process may exit before SIGCONT is
+		// delivered and the TUI can be restored.
+		const keepAlive = setInterval(() => {}, 2147483647);
+
 		// Set up handler to restore TUI when resumed
 		process.once("SIGCONT", () => {
+			clearInterval(keepAlive);
 			process.removeListener("SIGINT", ignoreSigint);
 			this.ui.start();
 			this.ui.requestRender(true);
